@@ -131,6 +131,35 @@ class EventCfg:
         },
     )
 
+    # --- sim2real domain randomization (physics) ---
+    # 随机化电机增益 + 关节摩擦，让策略容忍真机的动力学偏差，提升 sim2real 迁移。
+    # 参考 isaaclab manipulation/deploy/reach。客户端通过 sim2real_robustness 开关；
+    # 关闭时 launcher 用 Hydra 把这两项置 null（EventManager 会跳过 None 项）。
+    robot_joint_stiffness_and_damping = EventTerm(
+        func=mdp.randomize_actuator_gains,
+        min_step_count_between_reset=200,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "stiffness_distribution_params": (0.9, 1.1),
+            "damping_distribution_params": (0.75, 1.5),
+            "operation": "scale",
+            "distribution": "uniform",
+        },
+    )
+
+    robot_joint_friction = EventTerm(
+        func=mdp.randomize_joint_parameters,
+        min_step_count_between_reset=200,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "friction_distribution_params": (0.0, 0.1),
+            "operation": "add",
+            "distribution": "uniform",
+        },
+    )
+
 
 @configclass
 class RewardsCfg:
