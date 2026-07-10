@@ -1,0 +1,43 @@
+# 机器人目录:robot → 支持的任务(task 类型 → 注册 task id)+ DR 能力。
+# dr: true    = 已接入可开关的域随机化(SO-ARM,我们加的)
+#     false   = 该机器人任务暂未接入 DR(基础任务)
+#     builtin = 任务自带 DR、默认开启、不可关(如 locomotion)
+# 加机器人 = 在这里加一段;加任务类型 = 在 tasks/ 加一份 profile。
+
+so101:
+  name: SO-ARM101
+  group: 机械臂
+  dr: true
+  tasks:
+    reach: Isaac-SO-ARM101-Reach-v0
+    lift: Isaac-SO-ARM101-Lift-Cube-v0
+
+so100:
+  name: SO-ARM100
+  group: 机械臂
+  dr: true
+  tasks:
+    reach: Isaac-SO-ARM100-Reach-v0
+    lift: Isaac-SO-ARM100-Lift-Cube-v0
+
+franka:
+  name: Franka Panda
+  group: 机械臂
+  dr: false
+  tasks:
+    reach: Isaac-Reach-Franka-v0
+    lift: Isaac-Lift-Cube-Franka-v0
+
+ur10:
+  name: UR10
+  group: 机械臂
+  dr: false
+  tasks:
+    reach: Isaac-Reach-UR10-v0
+
+anymal_c:
+  name: Anymal-C
+  group: 四足
+  dr: builtin
+  tasks:
+    velocity: Isaac-Velocity-Flat-Anymal-C-v0

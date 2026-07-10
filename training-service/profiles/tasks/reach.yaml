@@ -1,0 +1,29 @@
+# Reach 任务类型 profile(与机器人无关)。哪些机器人支持它见 robots.yaml。
+name: 够点 (Reach)
+desc: 机械臂末端移动到随机目标点。
+# soarm101 的 train.py 同时注册了 SO-ARM 任务和基础 isaaclab_tasks,且含 rsl-rl 5.x 兼容,
+# 所以它能跑所有机器人(SO-ARM / Franka / UR),统一用它。
+train_script: soarm101/src/isaac_so_arm101/scripts/rsl_rl/train.py
+
+goal_zones:
+  target_zone:
+    label: 目标区域 (m)
+    axes:
+      x: {path: "env.commands.ee_pose.ranges.pos_x", default: [-0.10, 0.10], limits: [-0.35, 0.35], unit: m}
+      y: {path: "env.commands.ee_pose.ranges.pos_y", default: [-0.25, -0.10], limits: [-0.35, 0.35], unit: m}
+      z: {path: "env.commands.ee_pose.ranges.pos_z", default: [0.10, 0.30], limits: [0.0, 0.5], unit: m}
+
+behavior_presets:
+  balanced: {}
+  precise:
+    "env.rewards.end_effector_position_tracking_fine_grained.weight": 0.2
+    "env.rewards.end_effector_orientation_tracking.weight": -0.2
+  smooth:
+    "env.rewards.action_rate.weight": -0.001
+    "env.rewards.joint_vel.weight": -0.001
+
+# 仅当机器人 dr==true 且 sim2real 关闭时应用(把 SO-ARM 的 DR 项中和成 no-op)
+dr_off_overrides:
+  "env.events.robot_joint_stiffness_and_damping.params.stiffness_distribution_params": [1.0, 1.0]
+  "env.events.robot_joint_stiffness_and_damping.params.damping_distribution_params": [1.0, 1.0]
+  "env.events.robot_joint_friction.params.friction_distribution_params": [0.0, 0.0]

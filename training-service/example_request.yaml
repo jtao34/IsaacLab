@@ -2,16 +2,16 @@
 # 两层:通用底座 + 任务专属段(goal)。
 
 # --- 通用底座 ---
-model: so101                 # so100 | so101(现有 URDF)
-task: reach                  # 见 profiles/ 下支持的任务
+robot: so101                 # 见 profiles/robots.yaml(so100/so101/franka/ur10/anymal_c)
+task: reach                  # 该机器人支持的任务(见 robots.yaml)
 training_budget: standard    # quick | standard | thorough
-sim2real_robustness: true    # 开启物理域随机化,利于迁到真机
-record_video: false          # 录训练视频(存 logs/.../videos)
+sim2real_robustness: true    # 物理域随机化(仅 dr:true 的机器人可切换)
+record_video: false
 seed: 42
 output_name: my_reach_v1
-behavior: balanced           # balanced | precise | smooth
+behavior: balanced           # balanced | precise | smooth(取决于任务 profile)
 
-# --- 任务专属段(reach:目标区域) ---
+# --- 任务专属段(reach:目标区域;lift/velocity 结构不同,见各 tasks/<task>.yaml) ---
 goal:
   target_zone:
     x: [-0.10, 0.10]
@@ -21,4 +21,3 @@ goal:
 # --- 高级(专家,选填):额外 Hydra override,原样透传 ---
 advanced:
   overrides: []
-  # 例: ["agent.algorithm.learning_rate=5e-4", "env.episode_length_s=8.0"]

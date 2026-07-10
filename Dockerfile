@@ -9,3 +9,6 @@ RUN cd /workspace/isaaclab && ./isaaclab.sh --install
 
 RUN cd /workspace/isaaclab/soarm101 && \
       /workspace/isaaclab/isaaclab.sh -p -m pip install -e . --no-deps
+
+# TOS python SDK：训练 Job 训完用 training-service/upload_tos.py 把 checkpoint 传到火山 TOS
+RUN /workspace/isaaclab/isaaclab.sh -p -m pip install tos

@@ -1,0 +1,19 @@
+# Locomotion(速度跟踪)任务类型 profile —— 四足按指定速度行走。
+# 与机械臂任务结构不同:goal 是速度指令范围,而非空间坐标。
+# velocity 基类自带域随机化(robots.yaml 里 anymal_c 标 dr: builtin),故无 dr_off_overrides。
+name: 行走 (Locomotion)
+desc: 四足按指定速度平稳行走(域随机化已内置)。
+train_script: soarm101/src/isaac_so_arm101/scripts/rsl_rl/train.py
+
+goal_zones:
+  speed:
+    label: 速度指令
+    axes:
+      lin_x: {path: "env.commands.base_velocity.ranges.lin_vel_x", default: [-1.0, 1.0], limits: [-2.0, 2.0], unit: "m/s", name: 前后}
+      lin_y: {path: "env.commands.base_velocity.ranges.lin_vel_y", default: [-1.0, 1.0], limits: [-1.5, 1.5], unit: "m/s", name: 左右}
+      ang_z: {path: "env.commands.base_velocity.ranges.ang_vel_z", default: [-1.0, 1.0], limits: [-2.0, 2.0], unit: "rad/s", name: 转向}
+
+behavior_presets:
+  balanced: {}
+
+dr_off_overrides: {}
