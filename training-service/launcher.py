@@ -53,6 +53,14 @@ def build_command(request: dict[str, Any]) -> list[str]:
     if req.get("record_video"):
         argv += ["--video", "--video_length", "200", "--video_interval", "2000"]
 
+    # 场景/reward 模板(可选):请求里内联 template → 写出文件 → --template 传给 train.py
+    tmpl = req.get("template")
+    if tmpl:
+        tpath = "/tmp/_launcher_template.yaml"
+        with open(tpath, "w", encoding="utf-8") as f:
+            yaml.safe_dump(tmpl, f, allow_unicode=True)
+        argv += ["--template", tpath]
+
     overrides: list[str] = []
 
     # 1) 任务专属:goal_zones -> commands/events 范围

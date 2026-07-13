@@ -12,3 +12,6 @@ RUN cd /workspace/isaaclab/soarm101 && \
 
 # TOS python SDK：训练 Job 训完用 training-service/upload_tos.py 把 checkpoint 传到火山 TOS
 RUN /workspace/isaaclab/isaaclab.sh -p -m pip install tos
+
+# 独立 usd-core（standalone pxr）：给 inspect_usd.py 检测上传 USD 用，装独立目录不污染训练环境
+RUN /workspace/isaaclab/isaaclab.sh -p -m pip install --target /opt/usd-core usd-core

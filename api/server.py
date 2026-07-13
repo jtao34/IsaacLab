@@ -30,7 +30,7 @@ NAMESPACE = os.environ.get("K8S_NAMESPACE", "default")
 # 训练镜像:CI 出新 tag 后改这个环境变量(默认先用当前已验证的镜像)
 TRAIN_IMAGE = os.environ.get(
     "TRAIN_IMAGE",
-    "iaas-us-cn-beijing.cr.volces.com/physicalai/isaaclab:b3fa6918afd64b0fba64aff8e93a49b9",
+    "iaas-us-cn-beijing.cr.volces.com/physicalai/isaaclab:abd9ed344b3e44108a62d0e4dfd6ff0d",
 )
 # 挂给 Job 的 TOS 凭证 Secret 名(envFrom);没有则训练照跑、只是不上传
 TOS_SECRET = os.environ.get("TOS_SECRET", "tos-creds")
@@ -116,21 +116,80 @@ def train(req: dict):
     except schema.ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    batch, core, k8s = _k8s()
     name = f"train-{r['task']}-{uuid.uuid4().hex[:6]}"
-    # 请求写进 ConfigMap,Job 挂载
-    core.create_namespaced_config_map(
-        NAMESPACE,
-        k8s.V1ConfigMap(metadata=k8s.V1ObjectMeta(name=name), data={"request.yaml": yaml.safe_dump(r, allow_unicode=True)}),
-    )
-    batch.create_namespaced_job(NAMESPACE, _job_manifest(k8s, name, r))
+    try:
+        batch, core, k8s = _k8s()
+        # 请求写进 ConfigMap,Job 挂载
+        core.create_namespaced_config_map(
+            NAMESPACE,
+            k8s.V1ConfigMap(metadata=k8s.V1ObjectMeta(name=name), data={"request.yaml": yaml.safe_dump(r, allow_unicode=True)}),
+        )
+        batch.create_namespaced_job(NAMESPACE, _job_manifest(k8s, name, r))
+    except Exception as e:  # 集群连接/建 Job 失败 → 返回可读 JSON,而非 500 纯文本
+        raise HTTPException(status_code=502, detail=f"起 Job 失败(多为集群连接不稳,请重试):{type(e).__name__}: {str(e)[:200]}")
     return {"job": name, "task_id": schema.load_robots()[r["robot"]]["tasks"][r["task"]]}
+
+
+def _render_job_manifest(k8s, name: str, task_id: str, prefix: str):
+    """渲染预览 Job:跑 render_preview 出图 → 传 TOS(供前端取;无凭证会跳过)。申请 1 GPU。"""
+    cmd = (
+        "set -e; cd /workspace/isaaclab/training-service; mkdir -p /tmp/preview_out; "
+        f"../isaaclab.sh -p render_preview.py --task {task_id} --template /config/template.yaml --out /tmp/preview_out/preview.png; "
+        f"../isaaclab.sh -p upload_tos.py --local-dir /tmp/preview_out --prefix {prefix} || true"
+    )
+    container = k8s.V1Container(
+        name="render", image=TRAIN_IMAGE, command=["/bin/bash", "-lc", cmd],
+        resources=k8s.V1ResourceRequirements(limits={"nvidia.com/gpu": "1"}),
+        volume_mounts=[k8s.V1VolumeMount(name="cfg", mount_path="/config")],
+        env_from=[k8s.V1EnvFromSource(secret_ref=k8s.V1SecretEnvSource(name=TOS_SECRET, optional=True))],
+    )
+    pod_spec = k8s.V1PodSpec(
+        restart_policy="Never", containers=[container],
+        volumes=[k8s.V1Volume(name="cfg", config_map=k8s.V1ConfigMapVolumeSource(name=name))],
+    )
+    return k8s.V1Job(
+        metadata=k8s.V1ObjectMeta(name=name, labels={"app": "robot-render"}),
+        spec=k8s.V1JobSpec(
+            backoff_limit=0, ttl_seconds_after_finished=3600,
+            template=k8s.V1PodTemplateSpec(
+                metadata=k8s.V1ObjectMeta(labels={"app": "robot-render", "job": name}), spec=pod_spec),
+        ),
+    )
+
+
+@app.post("/api/render")
+def render(req: dict):
+    """渲染一张当前(带模板的)场景预览,让用户确认场景符合预期。"""
+    try:
+        r = schema.validate(req)
+    except schema.ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    name = f"render-{r['task']}-{uuid.uuid4().hex[:6]}"
+    task_id = schema.load_robots()[r["robot"]]["tasks"][r["task"]]
+    template = r.get("template", {"scene": {"assets": []}})
+    prefix = f"previews/{r.get('output_name') or name}"
+    try:
+        batch, core, k8s = _k8s()
+        core.create_namespaced_config_map(
+            NAMESPACE,
+            k8s.V1ConfigMap(metadata=k8s.V1ObjectMeta(name=name),
+                            data={"template.yaml": yaml.safe_dump(template, allow_unicode=True)}),
+        )
+        batch.create_namespaced_job(NAMESPACE, _render_job_manifest(k8s, name, task_id, prefix))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"起渲染 Job 失败(集群连接?):{type(e).__name__}: {str(e)[:200]}")
+    # 前端渲染完从 TOS 取 prefix/preview.png(TOS 接好后)
+    return {"job": name, "preview_key": f"{prefix}/preview.png"}
 
 
 @app.get("/api/jobs/{name}")
 def job_status(name: str):
-    batch, core, _ = _k8s()
-    job = batch.read_namespaced_job_status(name, NAMESPACE)
+    try:
+        batch, core, _ = _k8s()
+        job = batch.read_namespaced_job_status(name, NAMESPACE)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"查询 Job 失败(集群连接不稳,请重试):{type(e).__name__}")
     s = job.status
     phase = "运行中"
     if s.succeeded:
